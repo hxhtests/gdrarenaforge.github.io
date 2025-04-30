@@ -737,7 +737,6 @@ h1 {
     filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.3));
     transition: transform 0.3s ease;
     z-index: 1;
-    display: block; /* Mostro esplicitamente i loghi */
 }
 
 .mobile-version .menu::before {

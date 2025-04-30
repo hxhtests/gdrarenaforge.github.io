@@ -66,9 +66,25 @@ const MINIATURA_COMPLETA = `<div align="center"><div style="width:600px; line-he
 
 const MINIATURA_ARBITRO = `\n\n\n\n\n<div align="center"><div style="width:600px; line-height:100%; font-family: georgia; font-size:14px; color: black;text-align: justify; padding: 10px;"><div style="float: left; width: 150px; height: 150px; border: 5px solid black; border-radius: 100%; margin-right:5px; overflow: hidden;"><div style="width: 100%; height: 100%; background-image: url(https://i.imgur.com/zSbKd1D.png); background-size: cover; background-position: center;"></div></div><div style="width: auto; font-family: times; line-height: 20px; font-size: 20px; color: black; text-transform: uppercase; letter-spacing: 3px; text-shadow: 0 0 1px #7d7459; text-align: right; border-bottom: 5px solid black">[color=black]P.L. HILL - ARBITRO[/color]</div><div style="text-align: right; font-family: times; font-size: 14px; padding-top:5px; padding-bottom:3px; padding-left:5px; line-height:90%">Narrato - <i>[color=black]Pensato[/color]</i> - <b>[color=black]Parlato[/color]</b>&nbsp;</div><div style="text-align: justify; font-family: times; font-size: 15px; padding-top:5px; padding-bottom:3px; padding-left:5px; line-height:90%">`;
 
-const ARBITRO_VITTORIA_NPC = MINIATURA_ARBITRO + `L'arbitro alzò una mano, decretando la fine dell'incontro e indicando il vincitore.<b>[color=black]L'incontro è concluso! Il vincitore è "NOME_NPC" [/color]</b></div></div></div>\n\n[SPOILER]INCONTRO TERMINATO! A breve un membro dello Staff esaminerà l'incontro e verranno assegnate le ricompense![/SPOILER]`;
+const ARBITRO_VITTORIA_NPC = MINIATURA_ARBITRO + `L'arbitro osservò NOME_GIOCATORE mentre cadeva a terra, privo di forze.
 
-const ARBITRO_VITTORIA_GIOCATORE = MINIATURA_ARBITRO + `L'arbitro alzò una mano, decretando la fine dell'incontro e indicando il vincitore.<b>[color=black]L'incontro è concluso! Il vincitore è "NOME_GIOCATORE" [/color]</b></div></div></div>\n\n[SPOILER]INCONTRO TERMINATO! A breve un membro dello Staff esaminerà l'incontro e verranno assegnate le ricompense![/SPOILER]`;
+<b>[color=black]NOME_GIOCATORE non è più in grado di combattere. Il vincitore è NOME_NPC ![/color]</b>
+
+Esclamò, tendendo un braccio in sua direzione.
+
+</div><div style="border-bottom: 5px solid black"></div></div></div>
+
+<p align="center">[size=10]Incontro concluso![/size]</p>`;
+
+const ARBITRO_VITTORIA_GIOCATORE = MINIATURA_ARBITRO + `L'arbitro osservò NOME_NPC mentre cadeva a terra, privo di forze.
+
+<b>[color=black]NOME_NPC non è più in grado di combattere. Il vincitore è NOME_GIOCATORE ![/color]</b>
+
+Esclamò, tendendo un braccio in sua direzione.
+
+</div><div style="border-bottom: 5px solid black"></div></div></div>
+
+<p align="center">[size=10]Incontro concluso![/size]</p>`;
 
 // Modifica l'inizializzazione di npcList
 let npcList = [];
@@ -346,13 +362,13 @@ function generaPost() {
     const npcNome = document.getElementById('selectNPC').value;
     const nomeGiocatore = document.getElementById('nomeGiocatore').value;
     const esitoAttaccoPrecedente = document.getElementById('esitoAttaccoPrecedente').value;
-    const difesaNPC = parseInt(document.getElementById('difesaNPC').value);
-    const attaccoNPC = parseInt(document.getElementById('attaccoNPC').value);
-    const tenaciaDifesa = parseInt(document.getElementById('tenaciaDifesa').value);
-    const tenaciaAttacco = parseInt(document.getElementById('tenaciaAttacco').value);
-    const forzaAttacco = parseInt(document.getElementById('forzaAttacco').value);
-    const velocitaAttacco = parseInt(document.getElementById('velocitaAttacco').value);
-    const vitaResidua = parseInt(document.getElementById('vitaResidua').value);
+    const difesaNPC = parseInt(document.getElementById('difesaNPC').value) || 0;
+    const attaccoNPC = parseInt(document.getElementById('attaccoNPC').value) || 0;
+    const tenaciaDifesa = parseInt(document.getElementById('tenaciaDifesa').value) || 0;
+    const tenaciaAttacco = parseInt(document.getElementById('tenaciaAttacco').value) || 0;
+    const forzaAttacco = parseInt(document.getElementById('forzaAttacco').value) || 0;
+    const velocitaAttacco = parseInt(document.getElementById('velocitaAttacco').value) || 0;
+    const vitaResidua = parseInt(document.getElementById('vitaResidua').value) || 0;
     const ostinazioneDifesa = document.getElementById('ostinazioneDifesa').checked;
     const ostinazioneAttacco = document.getElementById('ostinazioneAttacco').checked;
 
@@ -362,93 +378,79 @@ function generaPost() {
         return;
     }
 
-    // Controllo valori NaN
-    if (isNaN(difesaNPC)) {
-        alert('Inserisci un valore valido per la difesa NPC');
-        return;
-    }
-    if (isNaN(attaccoNPC)) {
-        alert('Inserisci un valore valido per l\'attacco NPC');
-        return;
-    }
-    if (isNaN(tenaciaDifesa)) {
-        alert('Inserisci un valore valido per la tenacia difesa');
-        return;
-    }
-    if (isNaN(tenaciaAttacco)) {
-        alert('Inserisci un valore valido per la tenacia attacco');
-        return;
-    }
-    if (isNaN(forzaAttacco)) {
-        alert('Inserisci un valore valido per la forza attacco');
-        return;
-    }
-    if (isNaN(velocitaAttacco)) {
-        alert('Inserisci un valore valido per la velocità attacco');
-        return;
-    }
-    if (isNaN(vitaResidua)) {
-        alert('Inserisci un valore valido per la vita residua');
+    // Trova l'NPC selezionato
+    const npc = npcList.find(n => n.nome === npcNome);
+    if (!npc) {
+        alert('NPC non trovato');
         return;
     }
 
-    // Validazione specifica per ogni campo numerico
-    if (difesaNPC < 1 || difesaNPC > 5) {
-        alert('La difesa NPC deve essere un numero tra 1 e 5');
-        return;
-    }
+    // Se NON è vittoria NPC, esegui le validazioni numeriche
+    if (esitoAttaccoPrecedente !== 'vittoria_npc') {
+        if (difesaNPC < 1 || difesaNPC > 5) {
+            alert('La difesa NPC deve essere un numero tra 1 e 5');
+            return;
+        }
 
-    if (attaccoNPC < 1 || attaccoNPC > 5) {
-        alert('L\'attacco NPC deve essere un numero tra 1 e 5');
-        return;
-    }
+        if (attaccoNPC < 1 || attaccoNPC > 5) {
+            alert('L\'attacco NPC deve essere un numero tra 1 e 5');
+            return;
+        }
 
-    if (tenaciaDifesa < 1 || tenaciaDifesa > 100) {
-        alert('La tenacia difesa deve essere un numero tra 1 e 100');
-        return;
-    }
+        if (tenaciaDifesa < 1 || tenaciaDifesa > 100) {
+            alert('La tenacia difesa deve essere un numero tra 1 e 100');
+            return;
+        }
 
-    if (tenaciaAttacco < 1 || tenaciaAttacco > 100) {
-        alert('La tenacia attacco deve essere un numero tra 1 e 100');
-        return;
-    }
+        if (tenaciaAttacco < 1 || tenaciaAttacco > 100) {
+            alert('La tenacia attacco deve essere un numero tra 1 e 100');
+            return;
+        }
 
-    if (forzaAttacco < 1) {
-        alert('La forza attacco deve essere maggiore di 0');
-        return;
-    }
+        if (forzaAttacco < 0) {
+            alert('La forza attacco non può essere negativa');
+            return;
+        }
 
-    if (velocitaAttacco < 1) {
-        alert('La velocità attacco deve essere maggiore di 0');
-        return;
-    }
+        if (velocitaAttacco < 1) {
+            alert('La velocità attacco deve essere maggiore di 0');
+            return;
+        }
 
-    if (vitaResidua < 0) {
-        alert('La vita residua non può essere negativa');
-        return;
+        if (vitaResidua < 0) {
+            alert('La vita residua non può essere negativa');
+            return;
+        }
+
+        if (vitaResidua > npc.vitaIniziale) {
+            alert(`La vita residua non può essere superiore alla vita iniziale dell'NPC (${npc.vitaIniziale})`);
+            return;
+        }
     }
 
     let testoGenerato = '';
-    const npc = npcList.find(n => n.nome === npcNome);
     let difesa = 0;
     
     // Aggiungi il disclaimer
     testoGenerato += '[SPOILER] Risposta generata in modo semiautomatico senza controllo stretto dello Staff. In caso di problemi o dubbi contattare i Master [/SPOILER]\n\n';
     
     // Usa l'URL originale dell'immagine
-    if (!npc) {
-        alert('NPC non trovato');
-        return;
-    }
-    
     testoGenerato += MINIATURA_POST.replace('IMMAGINE_URL', npc.miniatura).replace('NOME_NPC', npc.nome) + '\n\n';
 
     // Gestione vittoria NPC
     if (esitoAttaccoPrecedente === 'vittoria_npc') {
+        if (!nomeGiocatore) {
+            alert('Inserisci il nome del giocatore per generare il messaggio di sconfitta');
+            return;
+        }
         const descrizioneVittoria = getDescrizioneCasuale('vittoria_npc');
-        testoGenerato += `${descrizioneVittoria}\n\n`;
-        testoGenerato += ARBITRO_VITTORIA_NPC.replace('NOME_NPC', npc.nome);
-        testoGenerato += '\nINCONTRO CONCLUSO';
+        if (descrizioneVittoria) {
+            testoGenerato += `${descrizioneVittoria}\n\n`;
+        }
+        const testoArbitro = ARBITRO_VITTORIA_NPC
+            .replace(/NOME_GIOCATORE/g, nomeGiocatore)
+            .replace(/NOME_NPC/g, npc.nome);
+        testoGenerato += testoArbitro;
         document.getElementById('generatedText').textContent = testoGenerato;
         return;
     }
@@ -519,8 +521,10 @@ function generaPost() {
                 if (descrizioneSconfitta) {
                     testoGenerato += `${descrizioneSconfitta}\n\n`;
                 }
-                testoGenerato += ARBITRO_VITTORIA_GIOCATORE.replace('NOME_GIOCATORE', nomeGiocatore);
-                testoGenerato += '\nINCONTRO CONCLUSO';
+                const testoArbitro = ARBITRO_VITTORIA_GIOCATORE
+                    .replace(/NOME_NPC/g, npc.nome)
+                    .replace(/NOME_GIOCATORE/g, nomeGiocatore);
+                testoGenerato += testoArbitro;
                 document.getElementById('generatedText').textContent = testoGenerato;
                 return;
             }
@@ -579,8 +583,10 @@ function generaPost() {
             if (descrizioneSconfitta) {
                 testoGenerato += `${descrizioneSconfitta}\n\n`;
             }
-            testoGenerato += ARBITRO_VITTORIA_GIOCATORE.replace('NOME_GIOCATORE', nomeGiocatore);
-            testoGenerato += '\nINCONTRO CONCLUSO';
+            const testoArbitro = ARBITRO_VITTORIA_GIOCATORE
+                .replace(/NOME_NPC/g, npc.nome)
+                .replace(/NOME_GIOCATORE/g, nomeGiocatore);
+            testoGenerato += testoArbitro;
             document.getElementById('generatedText').textContent = testoGenerato;
             return;
         }
@@ -667,11 +673,14 @@ function mostraNPCSelezionato() {
         return;
     }
     
+    // Costruisci il percorso dell'immagine in base al piano dell'NPC
+    const imagePath = `images/Default_NPC/${npc.pianoArenaCeleste}°.png`;
+    
     // Crea il contenuto HTML per l'NPC
     let html = `
         <div class="npc-card">
             <div class="npc-header">
-                <div class="avatar" style="background-image: url('${npc.miniatura}')"></div>
+                <div class="avatar" style="background-image: url('${imagePath}')"></div>
                 <div class="npc-info">
                     <h2>${npc.nome}</h2>
                     <p>Piano Arena Celeste: ${npc.pianoArenaCeleste}</p>
@@ -691,7 +700,6 @@ function mostraNPCSelezionato() {
     `;
     
     npcDetailContainer.innerHTML = html;
-    
     
     // Aggiungi il pulsante di eliminazione
     deleteButtonContainer.innerHTML = `
@@ -721,7 +729,7 @@ function mostraNPCSelezionato() {
     
     document.getElementById('previewContent').innerHTML = `
         <div class="miniatura-npc">
-            <div class="avatar" style="background-image: url('${npc.miniatura}')"></div>
+            <div class="avatar" style="background-image: url('${imagePath}')"></div>
             <div class="nome-personaggio">${npc.nome}</div>
             <div class="stile-testo">Piano Arena Celeste: ${npc.pianoArenaCeleste}</div>
             <div class="contenuto-testo">
