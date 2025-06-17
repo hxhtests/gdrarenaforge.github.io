@@ -674,7 +674,7 @@ function mostraNPCSelezionato() {
     }
     
     // Costruisci il percorso dell'immagine in base al piano dell'NPC
-    const imagePath = `images/Default_NPC/${npc.pianoArenaCeleste}°.png`;
+    const imagePath = npc.imageUrl || `images/Default_NPC/${npc.pianoArenaCeleste}°.png`;
     
     // Crea il contenuto HTML per l'NPC
     let html = `
@@ -1379,7 +1379,7 @@ async function caricaNPCDaFile(event) {
                         const miniaturaUrl = trimmedLine.replace('Miniatura:', '').trim();
                         // Salva l'URL dell'immagine e crea la miniatura
                         npc.imageUrl = miniaturaUrl;
-                        npc.miniatura = MINIATURA_BASE.replace('IMMAGINE_URL', miniaturaUrl).replace('NOME_NPC', npc.nome);
+                        npc.miniatura = miniaturaUrl;
                         console.log('URL miniatura caricato:', miniaturaUrl);
                     } else if (trimmedLine === 'Mosse Offensive:') {
                         currentSection = 'offensive';
