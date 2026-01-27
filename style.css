@@ -46,6 +46,27 @@
     top: 0;
 }
 
+/* Toast / messaggi non bloccanti (sostituiscono alert) */
+.toast-message {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 12px 20px;
+    border-radius: 6px;
+    z-index: 10000;
+    max-width: 320px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    animation: toastIn 0.3s ease;
+}
+.toast-success { background: var(--success-color); color: var(--white); }
+.toast-error { background: var(--error-color); color: var(--white); }
+.toast-warning { background: var(--warning-color); color: var(--text-color); }
+.toast-info { background: var(--info-color); color: var(--white); }
+@keyframes toastIn {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
 /* Error message */
 .error-message {
     background-color: var(--error-color);

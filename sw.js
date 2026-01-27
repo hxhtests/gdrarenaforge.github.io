@@ -1,30 +1,43 @@
-const CACHE_NAME = 'hxh-gdr-arena-forge-v1.0.1';
-const ASSETS_TO_CACHE = [
-    '/',
-    '/index.html',
-    '/npc.html',
-    '/role.html',
-    '/incontro.html',
-    '/style.css',
-    '/script.js',
-    '/manifest.json',
-    '/images/icon-192x192.png',
-    '/images/icon-512x512.png',
-    '/favicon.ico'
+const CACHE_NAME = 'hxh-gdr-arena-forge-v1.0.2';
+
+// Path base della app (funziona sia in root che in sottocartella, es. GitHub Pages)
+function getBaseUrl() {
+    const path = self.location.pathname.replace(/\/[^/]*$/, '/');
+    return self.location.origin + path;
+}
+
+const ASSET_PATHS = [
+    'index.html',
+    'npc.html',
+    'role.html',
+    'incontro.html',
+    'style.css',
+    'script.js',
+    'manifest.json',
+    'images/hunter-x-logo.png',
+    'offline.html'
 ];
 
 // Installazione del Service Worker
 self.addEventListener('install', (event) => {
+    const base = getBaseUrl();
+    const fullUrls = ASSET_PATHS.map(p => base + p);
+    if (base.replace(/\/$/, '') !== self.location.origin) {
+        fullUrls.unshift(base);
+    }
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then((cache) => {
                 console.log('Cache aperta');
-                return cache.addAll(ASSETS_TO_CACHE);
+                return cache.addAll(fullUrls.map(url => new Request(url, { redirect: 'follow' }))).catch((err) => {
+                    console.warn('Alcuni asset non cachati:', err);
+                });
             })
             .catch((error) => {
                 console.error('Errore durante il caching:', error);
             })
     );
+    self.skipWaiting();
 });
 
 // Attivazione del Service Worker
@@ -32,14 +45,12 @@ self.addEventListener('activate', (event) => {
     event.waitUntil(
         caches.keys().then((cacheNames) => {
             return Promise.all(
-                cacheNames.map((cacheName) => {
-                    if (cacheName !== CACHE_NAME) {
-                        console.log('Rimozione vecchia cache:', cacheName);
-                        return caches.delete(cacheName);
-                    }
+                cacheNames.filter((cn) => cn !== CACHE_NAME).map((cacheName) => {
+                    console.log('Rimozione vecchia cache:', cacheName);
+                    return caches.delete(cacheName);
                 })
             );
-        })
+        }).then(() => self.clients.claim())
     );
 });
 
@@ -77,8 +88,8 @@ self.addEventListener('fetch', (event) => {
                         return response;
                     })
                     .catch(() => {
-                        // Se la rete fallisce, prova a servire una pagina di fallback
-                        return caches.match('/offline.html');
+                        const base = getBaseUrl();
+                        return caches.match(base + 'offline.html').then(r => r || caches.match('offline.html'));
                     });
             })
     );

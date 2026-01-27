@@ -1,5 +1,58 @@
 // Aggiungi all'inizio del file
-console.log('Script caricato');
+// console.log('Script caricato'); // disabilitato in produzione
+
+// Escape HTML per prevenire XSS (usa ovunque si inseriscano dati utente in innerHTML)
+function escapeHtml(str) {
+    if (str == null || typeof str !== 'string') return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML.replace(/"/g, '&quot;');
+}
+
+// Escape per URL in attributi style (previene XSS in url())
+function escapeCssUrl(str) {
+    if (str == null || typeof str !== 'string') return '';
+    return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+
+// Salvataggio localStorage con gestione QuotaExceeded (riduce backup e riprova)
+function safeSetItem(key, value) {
+    try {
+        localStorage.setItem(key, value);
+        return true;
+    } catch (e) {
+        if (e && e.name === 'QuotaExceededError') {
+            var keys = Object.keys(localStorage).filter(function(k) { return k.indexOf('backup_') === 0; }).sort();
+            for (var i = 0; i < keys.length - 1; i++) {
+                localStorage.removeItem(keys[i]);
+                try {
+                    localStorage.setItem(key, value);
+                    return true;
+                } catch (_) {}
+            }
+            showMessage('Spazio insufficiente. Prova a eliminare alcuni NPC o backup.', 'error');
+        }
+        return false;
+    }
+}
+
+// Messaggi toast al posto di alert (accessibili e non bloccanti)
+function showMessage(messaggio, tipo) {
+    tipo = tipo || 'info';
+    const toast = document.createElement('div');
+    toast.className = `toast-message toast-${tipo}`;
+    toast.setAttribute('role', 'alert');
+    toast.textContent = messaggio;
+    toast.style.cssText = 'position:fixed;top:20px;right:20px;padding:12px 20px;border-radius:6px;z-index:10000;max-width:320px;box-shadow:0 4px 12px rgba(0,0,0,0.15);animation:toastIn 0.3s ease;';
+    const st = document.createElement('style');
+    st.textContent = '@keyframes toastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}.toast-success{background:#138525;color:#fff}.toast-error{background:#fe2016;color:#fff}.toast-info{background:#304438;color:#fff}.toast-warning{background:#abcc12;color:#000}';
+    document.head.appendChild(st);
+    document.body.appendChild(toast);
+    setTimeout(function() {
+        toast.style.animation = 'toastIn 0.2s ease reverse';
+        setTimeout(function() { toast.remove(); }, 200);
+    }, 3500);
+}
 
 // Funzioni di controllo login
 function checkLogin() {
@@ -138,9 +191,9 @@ function recuperaUltimoBackup() {
                 const backupData = JSON.parse(localStorage.getItem(key));
                 if (backupData && backupData.npcList && backupData.descrizioni) {
                     npcList = backupData.npcList;
-                    localStorage.setItem('npcList', JSON.stringify(npcList));
-                    localStorage.setItem('descrizioni', JSON.stringify(backupData.descrizioni));
-                    console.log('Backup recuperato con successo:', key);
+                    safeSetItem('npcList', JSON.stringify(npcList));
+                    safeSetItem('descrizioni', JSON.stringify(backupData.descrizioni));
+                    // Backup recuperato
                     return true;
                 }
             } catch (e) {
@@ -152,7 +205,7 @@ function recuperaUltimoBackup() {
         throw new Error('Nessun backup valido trovato');
     } catch (error) {
         console.error('Errore durante il recupero del backup:', error);
-        alert('Errore durante il recupero del backup: ' + error.message);
+        showMessage('Errore durante il recupero del backup: ' + error.message, 'error');
         return false;
     }
 }
@@ -166,20 +219,36 @@ function arrotonda(numero) {
     return Math.ceil(numero);
 }
 
-// Funzione unificata per popolare i select degli NPC
+// Funzione unificata per popolare i select degli NPC (ordine: piano, poi ordine default)
 function popolaSelectNPC(tipo) {
     const elementId = tipo === 'incontro' ? 'selectNPC' : 'npcSelector';
     const element = document.getElementById(elementId);
     if (!element) return;
 
-    // Ordina gli NPC in base al piano dell'arena
-    const npcListOrdinata = [...npcList].sort((a, b) => a.pianoArenaCeleste - b.pianoArenaCeleste);
+    var ordineDefaultPerPiano = {};
+    if (typeof defaultNPCs !== 'undefined' && defaultNPCs.npcs) {
+        defaultNPCs.npcs.forEach(function(npc) {
+            var p = npc.pianoArenaCeleste;
+            if (!ordineDefaultPerPiano[p]) ordineDefaultPerPiano[p] = [];
+            ordineDefaultPerPiano[p].push(npc.nome);
+        });
+    }
 
-    const options = npcListOrdinata.map((npc, index) => {
-        return `<option value="${npc.nome}">${npc.pianoArenaCeleste}° ${npc.nome}</option>`;
+    var npcListOrdinata = npcList.slice().sort(function(a, b) {
+        if (a.pianoArenaCeleste !== b.pianoArenaCeleste) return a.pianoArenaCeleste - b.pianoArenaCeleste;
+        var lista = ordineDefaultPerPiano[a.pianoArenaCeleste];
+        if (!lista || lista.length === 0) return String(a.nome).localeCompare(String(b.nome));
+        var ia = lista.indexOf(a.nome); var ib = lista.indexOf(b.nome);
+        if (ia === -1) ia = 999; if (ib === -1) ib = 999;
+        return ia - ib;
+    });
+
+    const options = npcListOrdinata.map((npc) => {
+        var nomeSafe = String(npc.nome).replace(/"/g, '&quot;');
+        return '<option value="' + nomeSafe + '">' + escapeHtml(String(npc.pianoArenaCeleste) + '° ' + npc.nome) + '</option>';
     }).join('');
     
-    element.innerHTML = `<option value="">Seleziona un NPC</option>${options}`;
+    element.innerHTML = '<option value="">Seleziona un NPC</option>' + options;
 }
 
 // Funzione per mostrare le statistiche dell'NPC selezionato
@@ -203,12 +272,12 @@ function mostraStatisticheNPC() {
     }
 
     statsDiv.innerHTML = `
-        <h3>Statistiche ${npcSelezionato.nome}</h3>
-        <p>Piano Arena Celeste: ${npcSelezionato.pianoArenaCeleste}°</p>
-        <p>Vita Iniziale: ${npcSelezionato.vitaIniziale}</p>
-        <p>Destrezza: ${npcSelezionato.destrezza}</p>
-        <p>Velocità: ${npcSelezionato.velocita}</p>
-        <p>Riflessi: ${npcSelezionato.riflessi}</p>
+        <h3>Statistiche ${escapeHtml(npcSelezionato.nome)}</h3>
+        <p>Piano Arena Celeste: ${escapeHtml(String(npcSelezionato.pianoArenaCeleste))}°</p>
+        <p>Vita Iniziale: ${escapeHtml(String(npcSelezionato.vitaIniziale))}</p>
+        <p>Destrezza: ${escapeHtml(String(npcSelezionato.destrezza))}</p>
+        <p>Velocità: ${escapeHtml(String(npcSelezionato.velocita))}</p>
+        <p>Riflessi: ${escapeHtml(String(npcSelezionato.riflessi))}</p>
     `;
 }
 
@@ -216,10 +285,10 @@ function mostraStatisticheNPC() {
 function copiaTestoGenerato() {
     const testoGenerato = document.getElementById('generatedText').textContent;
     navigator.clipboard.writeText(testoGenerato).then(() => {
-        alert('Testo copiato negli appunti!');
+        showMessage('Testo copiato negli appunti!', 'success');
     }).catch(err => {
         console.error('Errore durante la copia: ', err);
-        alert('Errore durante la copia del testo');
+        showMessage('Errore durante la copia del testo', 'error');
     });
 }
 
@@ -263,7 +332,7 @@ function inizializzaEsempiDescrizioni() {
     };
 
     // Salva le nuove descrizioni
-    localStorage.setItem('descrizioni', JSON.stringify(descrizioniIniziali));
+    safeSetItem('descrizioni', JSON.stringify(descrizioniIniziali));
     
     // Carica le descrizioni nella variabile globale
     descrizioni = descrizioniIniziali;
@@ -291,7 +360,7 @@ async function salvaDescrizione() {
         descrizioni[situazione].push(descrizione);
         
         // Salva nel localStorage
-        localStorage.setItem('descrizioni', JSON.stringify(descrizioni));
+        safeSetItem('descrizioni', JSON.stringify(descrizioni));
         
         // Aggiorna la visualizzazione
         mostraDescrizioniPerSituazione(situazione);
@@ -300,7 +369,7 @@ async function salvaDescrizione() {
         document.getElementById('txtDescrizione').value = '';
         
         // Mostra un messaggio di successo
-        alert('Descrizione salvata con successo!');
+        showMessage('Descrizione salvata con successo!', 'success');
         
         // Crea backup dopo il salvataggio
         creaBackupCompresso();
@@ -308,22 +377,28 @@ async function salvaDescrizione() {
         return true;
     } catch (error) {
         console.error('Errore durante il salvataggio della descrizione:', error);
-        alert('Errore durante il salvataggio: ' + error.message);
+        showMessage('Errore durante il salvataggio: ' + error.message, 'error');
         return false;
     }
 }
 
-// Funzione per mostrare le descrizioni di una situazione
+// Funzione per mostrare le descrizioni di una situazione (escape XSS)
 function mostraDescrizioniPerSituazione(situazione) {
     const elencoDescrizioni = document.getElementById('elencoDescrizioni');
+    if (!elencoDescrizioni) return;
     const descrizioniSituazione = descrizioni[situazione] || [];
     
     elencoDescrizioni.innerHTML = descrizioniSituazione.map((desc, index) => `
         <div class="descrizione-item">
-            <p>${desc}</p>
-            <button onclick="eliminaDescrizione('${situazione}', ${index})" class="button">Elimina</button>
+            <p>${escapeHtml(desc)}</p>
+            <button type="button" class="button btn-elimina-desc" data-situazione="${escapeHtml(situazione)}" data-index="${index}">Elimina</button>
         </div>
     `).join('');
+    elencoDescrizioni.querySelectorAll('.btn-elimina-desc').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            eliminaDescrizione(this.getAttribute('data-situazione'), parseInt(this.getAttribute('data-index'), 10));
+        });
+    });
 }
 
 // Funzione per eliminare una descrizione
@@ -333,7 +408,7 @@ function eliminaDescrizione(situazione, index) {
         descrizioni[situazione].splice(index, 1);
         
         // Aggiorna il localStorage con le nuove descrizioni
-        localStorage.setItem('descrizioni', JSON.stringify(descrizioni));
+        safeSetItem('descrizioni', JSON.stringify(descrizioni));
         
         // Aggiorna la visualizzazione
         mostraDescrizioniPerSituazione(situazione);
@@ -374,56 +449,56 @@ function generaPost() {
 
     // Validazione input
     if (!npcNome) {
-        alert('Seleziona un NPC');
+        showMessage('Seleziona un NPC', 'warning');
         return;
     }
 
     // Trova l'NPC selezionato
     const npc = npcList.find(n => n.nome === npcNome);
     if (!npc) {
-        alert('NPC non trovato');
+        showMessage('NPC non trovato', 'error');
         return;
     }
 
     // Se NON è vittoria NPC, esegui le validazioni numeriche
     if (esitoAttaccoPrecedente !== 'vittoria_npc') {
         if (difesaNPC < 1 || difesaNPC > 5) {
-            alert('La difesa NPC deve essere un numero tra 1 e 5');
+            showMessage('La difesa NPC deve essere un numero tra 1 e 5', 'warning');
             return;
         }
 
         if (attaccoNPC < 1 || attaccoNPC > 5) {
-            alert('L\'attacco NPC deve essere un numero tra 1 e 5');
+            showMessage('L\'attacco NPC deve essere un numero tra 1 e 5', 'warning');
             return;
         }
 
         if (tenaciaDifesa < 1 || tenaciaDifesa > 100) {
-            alert('La tenacia difesa deve essere un numero tra 1 e 100');
+            showMessage('La tenacia difesa deve essere un numero tra 1 e 100', 'warning');
             return;
         }
 
         if (tenaciaAttacco < 1 || tenaciaAttacco > 100) {
-            alert('La tenacia attacco deve essere un numero tra 1 e 100');
+            showMessage('La tenacia attacco deve essere un numero tra 1 e 100', 'warning');
             return;
         }
 
         if (forzaAttacco < 0) {
-            alert('La forza attacco non può essere negativa');
+            showMessage('La forza attacco non può essere negativa', 'warning');
             return;
         }
 
         if (velocitaAttacco < 1) {
-            alert('La velocità attacco deve essere maggiore di 0');
+            showMessage('La velocità attacco deve essere maggiore di 0', 'warning');
             return;
         }
 
         if (vitaResidua < 0) {
-            alert('La vita residua non può essere negativa');
+            showMessage('La vita residua non può essere negativa', 'warning');
             return;
         }
 
         if (vitaResidua > npc.vitaIniziale) {
-            alert(`La vita residua non può essere superiore alla vita iniziale dell'NPC (${npc.vitaIniziale})`);
+            showMessage('La vita residua non può essere superiore alla vita iniziale dell\'NPC (' + npc.vitaIniziale + ')', 'warning');
             return;
         }
     }
@@ -440,7 +515,7 @@ function generaPost() {
     // Gestione vittoria NPC
     if (esitoAttaccoPrecedente === 'vittoria_npc') {
         if (!nomeGiocatore) {
-            alert('Inserisci il nome del giocatore per generare il messaggio di sconfitta');
+            showMessage('Inserisci il nome del giocatore per generare il messaggio di sconfitta', 'warning');
             return;
         }
         const descrizioneVittoria = getDescrizioneCasuale('vittoria_npc');
@@ -514,7 +589,7 @@ function generaPost() {
             // Controllo sconfitta NPC
             if (isNPCSconfitto(npc, vitaDopoAttacco)) {
                 if (!nomeGiocatore) {
-                    alert('Inserisci il nome del giocatore per generare il messaggio di vittoria');
+                    showMessage('Inserisci il nome del giocatore per generare il messaggio di vittoria', 'warning');
                     return;
                 }
                 const descrizioneSconfitta = getDescrizioneCasuale('sconfitta_npc');
@@ -576,7 +651,7 @@ function generaPost() {
         // Controllo sconfitta NPC
         if (isNPCSconfitto(npc, vitaDopoAttacco)) {
             if (!nomeGiocatore) {
-                alert('Inserisci il nome del giocatore per generare il messaggio di vittoria');
+                showMessage('Inserisci il nome del giocatore per generare il messaggio di vittoria', 'warning');
                 return;
             }
             const descrizioneSconfitta = getDescrizioneCasuale('sconfitta_npc');
@@ -673,73 +748,76 @@ function mostraNPCSelezionato() {
         return;
     }
     
-    // Costruisci il percorso dell'immagine in base al piano dell'NPC
+    // Costruisci il percorso dell'immagine in base al piano dell'NPC (escape per XSS in url())
     const imagePath = npc.imageUrl || `images/Default_NPC/${npc.pianoArenaCeleste}°.png`;
+    const imagePathSafe = escapeCssUrl(imagePath);
     
-    // Crea il contenuto HTML per l'NPC
-    let html = `
+    // Crea il contenuto HTML per l'NPC (escape di tutti i dati utente)
+    const html = `
         <div class="npc-card">
             <div class="npc-header">
-                <div class="avatar" style="background-image: url('${imagePath}')"></div>
+                <div class="avatar" style="background-image: url('${imagePathSafe}')"></div>
                 <div class="npc-info">
-                    <h2>${npc.nome}</h2>
-                    <p>Piano Arena Celeste: ${npc.pianoArenaCeleste}</p>
-                    <p>Vita Iniziale: ${npc.vitaIniziale}</p>
-                    <p>Destrezza: ${npc.destrezza}</p>
-                    <p>Velocità: ${npc.velocita}</p>
-                    <p>Riflessi: ${npc.riflessi}</p>
+                    <h2>${escapeHtml(npc.nome)}</h2>
+                    <p>Piano Arena Celeste: ${escapeHtml(String(npc.pianoArenaCeleste))}</p>
+                    <p>Vita Iniziale: ${escapeHtml(String(npc.vitaIniziale))}</p>
+                    <p>Destrezza: ${escapeHtml(String(npc.destrezza))}</p>
+                    <p>Velocità: ${escapeHtml(String(npc.velocita))}</p>
+                    <p>Riflessi: ${escapeHtml(String(npc.riflessi))}</p>
                 </div>
             </div>
-            
             <div class="npc-controls">
                 <div class="control-group">
-                    <button onclick="mostraModal('movesetModal')">Mostra Moveset</button>
+                    <button type="button" class="btn-moveset-modal">Mostra Moveset</button>
                 </div>
             </div>
         </div>
     `;
-    
     npcDetailContainer.innerHTML = html;
+    npcDetailContainer.querySelector('.btn-moveset-modal')?.addEventListener('click', function() { mostraModal('movesetModal'); });
     
-    // Aggiungi il pulsante di eliminazione
-    deleteButtonContainer.innerHTML = `
-        <button onclick="confermaCancellazione('${npc.nome}')" class="button" style="background-color: #e74c3c;">
-            Elimina NPC
-        </button>
-    `;
+    // Pulsante di eliminazione con data-attribute (no onclick inline per XSS)
+    if (deleteButtonContainer) {
+        deleteButtonContainer.innerHTML = `<button type="button" class="button btn-elimina-npc" data-nome="${escapeHtml(npc.nome)}" style="background-color: #e74c3c;">Elimina NPC</button>`;
+        const btnDel = deleteButtonContainer.querySelector('.btn-elimina-npc');
+        if (btnDel) btnDel.addEventListener('click', function() { confermaCancellazione(this.getAttribute('data-nome')); });
+    }
     
-    // Popola i modali
-    document.getElementById('movesetContent').innerHTML = `
-        <h3>Moveset Difensivo</h3>
-        ${npc.movesetDifensivo.map(mossa => `
-            <div class="mossa-item">
-                <p><strong>Descrizione:</strong> ${mossa.descrizione}</p>
-                <p><strong>Valore:</strong> ${mossa.valore}</p>
+    const movesetContent = document.getElementById('movesetContent');
+    if (movesetContent) {
+        movesetContent.innerHTML = `
+            <h3>Moveset Difensivo</h3>
+            ${(npc.movesetDifensivo || []).map(m => `
+                <div class="mossa-item">
+                    <p><strong>Descrizione:</strong> ${escapeHtml(String(m.descrizione || ''))}</p>
+                    <p><strong>Valore:</strong> ${escapeHtml(String(m.valore ?? ''))}</p>
+                </div>
+            `).join('')}
+            <h3>Moveset Offensivo</h3>
+            ${(npc.movesetOffensivo || []).map(m => `
+                <div class="mossa-item">
+                    <p><strong>Descrizione:</strong> ${escapeHtml(String(m.descrizione || ''))}</p>
+                    <p><strong>Valore:</strong> ${escapeHtml(String(m.valore ?? ''))}</p>
+                </div>
+            `).join('')}
+        `;
+    }
+    const previewContent = document.getElementById('previewContent');
+    if (previewContent) {
+        previewContent.innerHTML = `
+            <div class="miniatura-npc">
+                <div class="avatar" style="background-image: url('${imagePathSafe}')"></div>
+                <div class="nome-personaggio">${escapeHtml(npc.nome)}</div>
+                <div class="stile-testo">Piano Arena Celeste: ${escapeHtml(String(npc.pianoArenaCeleste))}</div>
+                <div class="contenuto-testo">
+                    <p>Vita Iniziale: ${escapeHtml(String(npc.vitaIniziale))}</p>
+                    <p>Destrezza: ${escapeHtml(String(npc.destrezza))}</p>
+                    <p>Velocità: ${escapeHtml(String(npc.velocita))}</p>
+                    <p>Riflessi: ${escapeHtml(String(npc.riflessi))}</p>
+                </div>
             </div>
-        `).join('')}
-        
-        <h3>Moveset Offensivo</h3>
-        ${npc.movesetOffensivo.map(mossa => `
-            <div class="mossa-item">
-                <p><strong>Descrizione:</strong> ${mossa.descrizione}</p>
-                <p><strong>Valore:</strong> ${mossa.valore}</p>
-            </div>
-        `).join('')}
-    `;
-    
-    document.getElementById('previewContent').innerHTML = `
-        <div class="miniatura-npc">
-            <div class="avatar" style="background-image: url('${imagePath}')"></div>
-            <div class="nome-personaggio">${npc.nome}</div>
-            <div class="stile-testo">Piano Arena Celeste: ${npc.pianoArenaCeleste}</div>
-            <div class="contenuto-testo">
-                <p>Vita Iniziale: ${npc.vitaIniziale}</p>
-                <p>Destrezza: ${npc.destrezza}</p>
-                <p>Velocità: ${npc.velocita}</p>
-                <p>Riflessi: ${npc.riflessi}</p>
-            </div>
-        </div>
-    `;
+        `;
+    }
 }
 
 // Funzioni per mostrare/nascondere moveset
@@ -770,7 +848,7 @@ function cancellaNPC(nomeNPC) {
         npcList.splice(npcIndex, 1);
         
         // Aggiorna il localStorage
-        localStorage.setItem('npcList', JSON.stringify(npcList));
+        safeSetItem('npcList', JSON.stringify(npcList));
         
         // Aggiorna la visualizzazione nella pagina NPC
         popolaSelectNPC('npc');  // Aggiorna il selettore nella pagina NPC
@@ -780,7 +858,7 @@ function cancellaNPC(nomeNPC) {
         document.getElementById('npcDetailContainer').innerHTML = '';
         document.getElementById('deleteButtonContainer').innerHTML = '';
         
-        alert(`L'NPC "${nomeNPC}" è stato cancellato con successo.`);
+        showMessage('L\'NPC "' + nomeNPC + '" è stato cancellato con successo.', 'success');
     }
 }
 
@@ -1044,9 +1122,9 @@ window.onload = async function() {
         });
         
         inputFile.addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                caricaNPCDaFile(file);
+            if (e.target.files && e.target.files.length > 0) {
+                caricaNPCDaFile(e);
+                e.target.value = '';
             }
         });
     }
@@ -1269,7 +1347,7 @@ async function creaNuovoNPC(event) {
             }
         } catch (error) {
             console.error(`Errore nella validazione dell'immagine per l'NPC ${npc.nome}:`, error);
-            alert('L\'URL dell\'immagine non è valido. Inserisci un URL valido che inizi con http:// o https://');
+            showMessage('L\'URL dell\'immagine non è valido. Inserisci un URL valido che inizi con http:// o https://', 'warning');
             return false;
         }
 
@@ -1279,7 +1357,7 @@ async function creaNuovoNPC(event) {
         
         // Salvataggio
         npcList.push(npc);
-        localStorage.setItem('npcList', JSON.stringify(npcList));
+        safeSetItem('npcList', JSON.stringify(npcList));
         
         // Crea backup dopo la creazione
         creaBackupCompresso();
@@ -1293,12 +1371,12 @@ async function creaNuovoNPC(event) {
         nascondiModal('creaNPCModal');
         popolaSelectNPC();
         
-        alert('NPC creato e salvato con successo!');
+        showMessage('NPC creato e salvato con successo!', 'success');
         aggiornaPagina();
         return true;
     } catch (error) {
         console.error('Errore durante la creazione dell\'NPC:', error);
-        alert('Errore durante la creazione: ' + error.message);
+        showMessage('Errore durante la creazione: ' + error.message, 'error');
         return false;
     }
 }
@@ -1332,27 +1410,26 @@ async function validaImmagineCaricata(url) {
 // Funzione per caricare un NPC da file
 async function caricaNPCDaFile(event) {
     const files = event.target.files;
-    if (!files || files.length === 0) {
-        console.log('Nessun file selezionato');
-        return;
-    }
+    if (!files || files.length === 0) return;
+
+    const erroriCaricamento = [];
 
     try {
-        // Carica la lista NPC esistente
         let npcList = JSON.parse(localStorage.getItem('npcList') || '[]');
-        
-        // Processa tutti i file in parallelo
+        const listaIniziale = npcList.length;
+
         const processPromises = Array.from(files).map(async (file) => {
             try {
-                console.log('Elaborazione file:', file.name);
                 const contenuto = await new Promise((resolve, reject) => {
                     const reader = new FileReader();
                     reader.onload = (e) => resolve(e.target.result);
-                    reader.onerror = (e) => reject(e);
+                    reader.onerror = () => reject(new Error('Impossibile leggere il file'));
                     reader.readAsText(file);
                 });
 
-                console.log('Contenuto file letto:', contenuto.substring(0, 100) + '...');
+                if (!contenuto || !contenuto.includes('Nome:') || !contenuto.includes('Piano Arena Celeste:')) {
+                    throw new Error('Il file non sembra un file NPC valido. Usa un .txt esportato da questa app (deve contenere Nome:, Piano Arena Celeste:, ecc.).');
+                }
 
                 const lines = contenuto.split('\n');
                 let npc = {};
@@ -1362,7 +1439,6 @@ async function caricaNPCDaFile(event) {
                     const trimmedLine = line.trim();
                     if (!trimmedLine) continue;
 
-                    // Estrai le informazioni dal file
                     if (trimmedLine.startsWith('Nome:')) {
                         npc.nome = trimmedLine.replace('Nome:', '').trim();
                     } else if (trimmedLine.startsWith('Piano Arena Celeste:')) {
@@ -1377,10 +1453,8 @@ async function caricaNPCDaFile(event) {
                         npc.riflessi = parseInt(trimmedLine.replace('Riflessi:', '').trim());
                     } else if (trimmedLine.startsWith('Miniatura:')) {
                         const miniaturaUrl = trimmedLine.replace('Miniatura:', '').trim();
-                        // Salva l'URL dell'immagine e crea la miniatura
                         npc.imageUrl = miniaturaUrl;
                         npc.miniatura = miniaturaUrl;
-                        console.log('URL miniatura caricato:', miniaturaUrl);
                     } else if (trimmedLine === 'Mosse Offensive:') {
                         currentSection = 'offensive';
                         npc.movesetOffensivo = [];
@@ -1401,60 +1475,55 @@ async function caricaNPCDaFile(event) {
                     }
                 }
 
-                // Verifica che l'NPC sia valido
-                if (!npc.nome || !npc.pianoArenaCeleste || !npc.vitaIniziale || 
-                    !npc.destrezza || !npc.velocita || !npc.riflessi || 
+                if (!npc.nome || !npc.pianoArenaCeleste || !npc.vitaIniziale ||
+                    !npc.destrezza || !npc.velocita || !npc.riflessi ||
                     !npc.miniatura || !npc.movesetOffensivo || !npc.movesetDifensivo) {
-                    throw new Error(`File ${file.name} non contiene tutti i dati necessari per l'NPC`);
+                    throw new Error('Mancano dati obbligatori (Nome, Piano Arena, Vita, Mosse, ecc.).');
                 }
 
-                // Verifica se l'NPC esiste già
                 const existingIndex = npcList.findIndex(n => n.nome === npc.nome);
                 if (existingIndex !== -1) {
                     if (confirm(`Un NPC con il nome "${npc.nome}" esiste già. Vuoi sovrascriverlo?`)) {
                         npcList[existingIndex] = npc;
-                        console.log('NPC sovrascritto:', npc.nome);
                     }
                 } else {
                     npcList.push(npc);
-                    console.log('Nuovo NPC aggiunto:', npc.nome);
                 }
             } catch (error) {
-                console.error(`Errore nel caricamento del file ${file.name}:`, error);
-                alert(`Errore nel caricamento del file ${file.name}: ${error.message}`);
+                erroriCaricamento.push({ file: file.name, msg: error.message });
             }
         });
 
-        // Attendi che tutti i file siano processati
         await Promise.all(processPromises);
 
-        // Aggiorna la lista globale e il localStorage
-        window.npcList = npcList;
-        localStorage.setItem('npcList', JSON.stringify(npcList));
-
-        // Aggiorna il selettore
-        const npcSelector = document.getElementById('npcSelector');
-        if (npcSelector) {
-            npcSelector.innerHTML = '<option value="">Seleziona un NPC</option>';
-            npcList.forEach(npc => {
-                const option = document.createElement('option');
-                option.value = npc.nome;
-                option.textContent = npc.nome;
-                npcSelector.appendChild(option);
-            });
-
-            // Se c'è almeno un NPC, seleziona il primo
-            if (npcList.length > 0) {
-                npcSelector.value = npcList[0].nome;
-                mostraNPCSelezionato();
+        // Se ci sono errori, mostrali in pagina (non fare reload così il messaggio resta visibile)
+        if (erroriCaricamento.length > 0) {
+            const testo = erroriCaricamento.length === files.length
+                ? 'Nessun file valido. Usa solo file .txt esportati da questa app (con Nome:, Piano Arena Celeste:, Vita Iniziale:, Mosse, ecc.).'
+                : 'File non validi: ' + erroriCaricamento.map(e => e.file + ' — ' + e.msg).join(' | ');
+            showMessage(testo, 'error');
+            if (npcList.length === listaIniziale) {
+                return;
             }
         }
 
-        alert('NPC caricati con successo!');
-        aggiornaPagina();
+        window.npcList = npcList;
+        safeSetItem('npcList', JSON.stringify(npcList));
+
+        popolaSelectNPC('npcSelector');
+        popolaSelectNPC('incontro');
+        const npcSelector = document.getElementById('npcSelector');
+        if (npcSelector && npcList.length > 0) {
+            npcSelector.value = npcSelector.options[1] ? npcSelector.options[1].value : npcList[0].nome;
+            mostraNPCSelezionato();
+        }
+
+        if (erroriCaricamento.length === 0) {
+            showMessage('NPC caricati con successo!', 'success');
+            aggiornaPagina();
+        }
     } catch (error) {
-        console.error('Errore nel caricamento degli NPC:', error);
-        alert('Errore nel caricamento degli NPC: ' + error.message);
+        showMessage('Errore durante il caricamento: ' + (error && error.message ? error.message : 'errore sconosciuto'), 'error');
     }
 }
 
@@ -1470,9 +1539,9 @@ function creaBackupCompresso() {
         // Comprimi i dati
         const compressedData = JSON.stringify(data);
         
-        // Salva il backup con timestamp
+        // Salva il backup con timestamp (usa safeSetItem per gestire QuotaExceeded)
         const backupKey = `backup_${data.timestamp}`;
-        localStorage.setItem(backupKey, compressedData);
+        if (!safeSetItem(backupKey, compressedData)) return false;
         
         // Mantieni solo gli ultimi 5 backup
         const backupKeys = Object.keys(localStorage)
@@ -1484,7 +1553,7 @@ function creaBackupCompresso() {
             backupKeys.slice(5).forEach(key => localStorage.removeItem(key));
         }
         
-        console.log('Backup creato con successo:', backupKey);
+        // Backup creato
         return true;
     } catch (error) {
         console.error('Errore durante la creazione del backup:', error);
@@ -2237,6 +2306,218 @@ const defaultNPCs = {
                     "valore": 400
                 }
             ]
+        },
+        {
+            "nome": "Goro Domon",
+            "pianoArenaCeleste": 0,
+            "vitaIniziale": 500,
+            "destrezza": 25,
+            "velocita": 20,
+            "riflessi": 15,
+            "miniatura": "https://upload.forumfree.net/i/fc9375543/goro.jpg",
+            "movesetOffensivo": [
+                {
+                    "descrizione": "Goro scatta lateralmente e scaglia un gancio improvviso, puntando alla tempia del nemico con la rapidità tipica di una rissa tra i vicoli.",
+                    "valore": 30
+                },
+                {
+                    "descrizione": "Sfruttando la sua agilità, Goro sferra una scarica di tre pugni rapidi al volto, cercando di stordire l'avversario con la pura velocità.",
+                    "valore": 20
+                },
+                {
+                    "descrizione": "Senza alcun senso dell'onore, Goro finge un pugno alto per poi colpire violentemente con un calcio stinco-su-stinco o direttamente ai genitali.",
+                    "valore": 15
+                },
+                {
+                    "descrizione": "Goro si abbassa di scatto e scivola dietro le gambe del nemico, tentando di colpirlo dietro le ginocchia per farlo crollare.",
+                    "valore": 10
+                },
+                {
+                    "descrizione": "Goro sputa vicino ai piedi del nemico e lo insulta pesantemente, sferrando un buffetto rapido per farlo infuriare e deconcentrare.",
+                    "valore": 0
+                }
+            ],
+            "movesetDifensivo": [
+                {
+                    "descrizione": "Goro esegue un movimento fulmineo del busto, abituato a schivare colpi di bottiglia o armi improvvisate nei bassifondi.",
+                    "valore": 30
+                },
+                {
+                    "descrizione": "Il ragazzo stringe la guardia e incassa il colpo con le nocche fasciate, pronto a rimbalzare via per attutire l'impatto.",
+                    "valore": 20
+                },
+                {
+                    "descrizione": "Non tenta di parare, ma usa le gambe agili per saltare fuori dalla traiettoria principale dell'attacco all'ultimo secondo.",
+                    "valore": 15
+                },
+                {
+                    "descrizione": "Goro subisce il colpo ma lo trasforma in una rotazione, usando il dolore per caricare l'adrenalina e rimanere in piedi con un ghigno.",
+                    "valore": 10
+                },
+                {
+                    "descrizione": "Goro riesce a schivare l'attacco con un movimento agile e preciso | Goro cerca di schivare l'attacco, senza riuscirci",
+                    "valore": 30
+                }
+            ]
+        },
+        {
+            "nome": "Suki Hazuki",
+            "pianoArenaCeleste": 0,
+            "vitaIniziale": 700,
+            "destrezza": 30,
+            "velocita": 35,
+            "riflessi": 20,
+            "miniatura": "https://upload.forumfree.net/i/fc9375543/Suki.jpg",
+            "movesetOffensivo": [
+                {
+                    "descrizione": "Suki scatta in avanti sferrando un colpo rapido con la punta delle dita tese, mirando alla gola o agli occhi.",
+                    "valore": 30
+                },
+                {
+                    "descrizione": "Suki ruota su se stessa e scaglia un calcio circolare fulmineo, usando la velocità di rotazione per generare potenza.",
+                    "valore": 25
+                },
+                {
+                    "descrizione": "Suki salta sulle spalle dell'avversario e avvolge le gambe attorno al suo busto, colpendolo ripetutamente alle tempie.",
+                    "valore": 20
+                },
+                {
+                    "descrizione": "Un colpo secco di taglio della mano mirato ai tendini del braccio, volto a paralizzare temporaneamente l'arto nemico.",
+                    "valore": 15
+                },
+                {
+                    "descrizione": "Suki si limita a un colpetto di dita sulla fronte del nemico, mantenendo un'espressione di totale superiorità.",
+                    "valore": 0
+                }
+            ],
+            "movesetDifensivo": [
+                {
+                    "descrizione": "Suki flette il corpo con un movimento sinuoso, lasciando che il colpo scivoli via senza toccarla minimamente.",
+                    "valore": 50
+                },
+                {
+                    "descrizione": "Suki usa le braccia per deviare la traiettoria dell'attacco mentre esegue una capriola all'indietro.",
+                    "valore": 40
+                },
+                {
+                    "descrizione": "Suki scivola lateralmente con eleganza, posizionandosi in un angolo cieco mentre il colpo fende l'aria.",
+                    "valore": 30
+                },
+                {
+                    "descrizione": "Suki sembra scoperta, ma all'ultimo istante ruota il busto subendo solo un colpo di striscio che lei ignora con freddezza.",
+                    "valore": 20
+                },
+                {
+                    "descrizione": "Suki riesce a schivare l'attacco con un movimento agile e preciso | Suki cerca di schivare l'attacco, senza riuscirci",
+                    "valore": 50
+                }
+            ]
+        },
+        {
+            "nome": "Billy Crane",
+            "pianoArenaCeleste": 0,
+            "vitaIniziale": 900,
+            "destrezza": 80,
+            "velocita": 35,
+            "riflessi": 35,
+            "miniatura": "https://upload.forumfree.net/i/fc9375543/billy.jpg",
+            "movesetOffensivo": [
+                {
+                    "descrizione": "Billy muove le mani vorticosamente davanti al volto dell'avversario; mentre questi cerca di seguirne il ritmo, Billy sferra un colpo secco alla gola con la mano rimasta nascosta.",
+                    "valore": 45
+                },
+                {
+                    "descrizione": "Billy esegue una finta di corpo verso destra, ma con un movimento innaturale delle articolazioni colpisce con un calcio frustato dal lato opposto.",
+                    "valore": 35
+                },
+                {
+                    "descrizione": "Sfruttando la sua postura snodata, Billy si abbassa fin quasi a toccare il suolo per poi scattare verso l'alto con un montante mirato alla mascella.",
+                    "valore": 25
+                },
+                {
+                    "descrizione": "Billy sfiora ripetutamente le braccia del nemico con colpi leggeri e ritmati, per poi esplodere improvvisamente con una palmata violenta al centro del petto.",
+                    "valore": 20
+                },
+                {
+                    "descrizione": "Billy esegue un inchino teatrale e schiocca le dita davanti agli occhi del nemico: un semplice gesto di scherno per irritare l'avversario.",
+                    "valore": 0
+                }
+            ],
+            "movesetDifensivo": [
+                {
+                    "descrizione": "Billy flette il busto in modo estremo, quasi si spezzasse a metà, facendo passare l'attacco nemico a millimetri dalla sua pelle.",
+                    "valore": 60
+                },
+                {
+                    "descrizione": "Billy asseconda la forza del colpo avversario ruotando su se stesso, dissipando l'energia dell'impatto con una piroetta acrobatica.",
+                    "valore": 50
+                },
+                {
+                    "descrizione": "Con un rapido gioco di gambe, Billy altera la percezione della distanza, inducendo l'avversario a colpire troppo corto o troppo lungo.",
+                    "valore": 40
+                },
+                {
+                    "descrizione": "Billy incrocia le braccia in una posa bizzarra; subisce il colpo ma lo incanala lateralmente, minimizzando i danni con un sorriso beffardo.",
+                    "valore": 30
+                },
+                {
+                    "descrizione": "Billy riesce a schivare l'attacco con un movimento agile e preciso | Billy cerca di schivare l'attacco, senza riuscirci",
+                    "valore": 60
+                }
+            ]
+        },
+        {
+            "nome": "Rhino Vercetti",
+            "pianoArenaCeleste": 0,
+            "vitaIniziale": 1100,
+            "destrezza": 70,
+            "velocita": 45,
+            "riflessi": 50,
+            "miniatura": "https://upload.forumfree.net/i/fc9375543/rhino.jpg",
+            "movesetOffensivo": [
+                {
+                    "descrizione": "Rhino afferra l'avversario per le orecchie e gli scaglia una testata brutale sul setto nasale.",
+                    "valore": 55
+                },
+                {
+                    "descrizione": "Un gancio corto e pesantissimo mirato alla mascella, lanciato senza preavviso e con estrema cattiveria.",
+                    "valore": 40
+                },
+                {
+                    "descrizione": "Rhino finge un pugno e invece colpisce con la punta del gomito dritto sullo zigomo del nemico.",
+                    "valore": 35
+                },
+                {
+                    "descrizione": "Rhino sferra un calcio basso e laterale mirato a far cedere l'articolazione della gamba d'appoggio nemica.",
+                    "valore": 30
+                },
+                {
+                    "descrizione": "Rhino sputa per terra ai piedi dell'avversario e gli tira un buffetto sulla guancia, guardandolo con disprezzo.",
+                    "valore": 0
+                }
+            ],
+            "movesetDifensivo": [
+                {
+                    "descrizione": "Rhino abbassa il mento e flette il collo, incassando il colpo sulla parte superiore del cranio per danneggiare la mano del nemico.",
+                    "valore": 65
+                },
+                {
+                    "descrizione": "Rhino intercetta il colpo con un movimento minimo del braccio, contraendo i muscoli come se fossero di pietra.",
+                    "valore": 50
+                },
+                {
+                    "descrizione": "Rhino mette una mano sulla spalla del nemico mentre questo attacca, limitando la gittata e la potenza del colpo.",
+                    "valore": 40
+                },
+                {
+                    "descrizione": "Rhino accetta di subire l'attacco in pieno petto, ma usa l'impatto per caricare il suo prossimo colpo di risposta.",
+                    "valore": 30
+                },
+                {
+                    "descrizione": "Rhino riesce a schivare l'attacco con un movimento agile e preciso | Rhino cerca di schivare l'attacco, senza riuscirci",
+                    "valore": 65
+                }
+            ]
         }
     ]
 };
@@ -2280,25 +2561,29 @@ async function caricaNPCDefaultManuale() {
                     velocita: npc.velocita,
                     riflessi: npc.riflessi,
                     miniatura: npc.miniatura,
+                    imageUrl: npc.miniatura,
                     movesetDifensivo: npc.movesetDifensivo,
                     movesetOffensivo: npc.movesetOffensivo
                 };
                 
-                // Aggiungi l'NPC alla lista
+                // Aggiungi l'NPC alla lista e aggiorna la variabile globale
                 const savedNPCList = JSON.parse(localStorage.getItem('npcList') || '[]');
                 savedNPCList.push(npcCompleto);
-                localStorage.setItem('npcList', JSON.stringify(savedNPCList));
+                safeSetItem('npcList', JSON.stringify(savedNPCList));
+                npcList = savedNPCList;
+                if (typeof window !== 'undefined') window.npcList = npcList;
                 
-                // Aggiorna l'interfaccia
+                // Aggiorna l'interfaccia (senza reload così il toast resta visibile)
                 popolaSelectNPC('npcSelector');
+                const sel = document.getElementById('npcSelector');
+                if (sel) sel.value = npc.nome;
                 mostraNPCSelezionato();
                 
                 // Chiudi il modal
                 modal.style.display = 'none';
                 
-                // Mostra messaggio di successo
-                alert(`NPC ${npc.nome} caricato con successo!`);
-                aggiornaPagina();
+                // Mostra messaggio di successo (visibile perché non si ricarica la pagina)
+                showMessage('NPC "' + npc.nome + '" caricato con successo!', 'success');
             });
             
             listaNPCDefault.appendChild(npcItem);
@@ -2306,7 +2591,7 @@ async function caricaNPCDefaultManuale() {
         
     } catch (error) {
         console.error('Errore durante il caricamento degli NPC:', error);
-        alert('Si è verificato un errore durante il caricamento degli NPC: ' + error.message);
+        showMessage('Si è verificato un errore durante il caricamento degli NPC: ' + error.message, 'error');
     }
 }
 // Aggiungi l'event listener per il pulsante
@@ -2339,7 +2624,7 @@ function cancellaTuttiNPC() {
         document.getElementById('npcDetailContainer').innerHTML = '';
         document.getElementById('deleteButtonContainer').innerHTML = '';
         
-        alert('Tutti gli NPC sono stati cancellati con successo.');
+        showMessage('Tutti gli NPC sono stati cancellati con successo.', 'success');
         aggiornaPagina();
     }
 }

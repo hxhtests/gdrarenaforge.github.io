@@ -57,35 +57,65 @@
     </div>
 
     <script>
-        // Credenziali fisse
-        const VALID_USERNAME = 'hxh';
-        const VALID_PASSWORD = 'gdrremastered';
+        // NOTA SICUREZZA: in produzione usare autenticazione lato server. Le credenziali qui sono solo per uso locale/demo.
+        (function() {
+            var MAX_ATTEMPTI = 5;
+            var BLOCCO_SECONDI = 120;
+            var TENTATIVI_KEY = 'login_tentativi';
+            var BLOCCO_FINO_KEY = 'login_blocco_fino';
 
-        document.getElementById('loginForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            const errorMessage = document.getElementById('errorMessage');
+            function credenzialiValide(u, p) {
+                return u === 'hxh' && p === 'gdrremastered';
+            }
 
-            if (username === VALID_USERNAME && password === VALID_PASSWORD) {
-                // Salva lo stato di login nel localStorage
-                localStorage.setItem('isLoggedIn', 'true');
-                // Reindirizza alla home
-                window.location.href = 'index.html';
-            } else {
+            function inBlocco() {
+                var fino = sessionStorage.getItem(BLOCCO_FINO_KEY);
+                if (!fino) return false;
+                return Date.now() < parseInt(fino, 10);
+            }
+
+            function resetTentativi() {
+                sessionStorage.removeItem(TENTATIVI_KEY);
+                sessionStorage.removeItem(BLOCCO_FINO_KEY);
+            }
+
+            document.getElementById('loginForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                var username = document.getElementById('username').value.trim();
+                var password = document.getElementById('password').value;
+                var errorMessage = document.getElementById('errorMessage');
+
+                if (inBlocco()) {
+                    errorMessage.textContent = 'Troppi tentativi. Riprova tra qualche minuto.';
+                    errorMessage.style.display = 'block';
+                    return;
+                }
+
+                if (credenzialiValide(username, password)) {
+                    resetTentativi();
+                    localStorage.setItem('isLoggedIn', 'true');
+                    window.location.href = 'index.html';
+                    return;
+                }
+
+                var n = parseInt(sessionStorage.getItem(TENTATIVI_KEY) || '0', 10) + 1;
+                sessionStorage.setItem(TENTATIVI_KEY, String(n));
+                if (n >= MAX_ATTEMPTI) {
+                    sessionStorage.setItem(BLOCCO_FINO_KEY, String(Date.now() + BLOCCO_SECONDI * 1000));
+                    errorMessage.textContent = 'Troppi tentativi errati. Attendi ' + BLOCCO_SECONDI + ' secondi.';
+                } else {
+                    errorMessage.textContent = 'Credenziali non valide. Riprova. (tentativo ' + n + '/' + MAX_ATTEMPTI + ')';
+                }
                 errorMessage.style.display = 'block';
-                // Pulisci i campi
                 document.getElementById('password').value = '';
-            }
-        });
+            });
 
-        // Controlla se l'utente è già loggato
-        window.addEventListener('load', function() {
-            if (localStorage.getItem('isLoggedIn') === 'true') {
-                window.location.href = 'index.html';
-            }
-        });
+            window.addEventListener('load', function() {
+                if (localStorage.getItem('isLoggedIn') === 'true') {
+                    window.location.href = 'index.html';
+                }
+            });
+        })();
     </script>
 </body>
 </html> 

@@ -10,8 +10,8 @@
     <meta property="og:title" content="HxH GDR Arena Forge - Sistema di Gestione NPC">
     <meta property="og:description" content="Sistema avanzato di gestione NPC per arena di combattimento. Crea, gestisci e simula combattimenti.">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="http://localhost:8080/">
-    <meta property="og:image" content="http://localhost:8080/images/logo.png">
+    <meta property="og:url" content="https://hxhtest.github.io/">
+    <meta property="og:image" content="https://hxhtest.github.io/images/hunter-x-logo.png">
     <title>HxH GDR Arena Forge - Sistema di Gestione NPC</title>
     <link rel="stylesheet" href="style.css">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
@@ -96,16 +96,15 @@
             return false;
         };
 
-        // Service Worker per PWA
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js')
-                    .then(registration => {
-                        console.log('ServiceWorker registrato');
-                    })
-                    .catch(error => {
-                        console.error('Errore nella registrazione del ServiceWorker:', error);
-                    });
+        // Service Worker per PWA: funziona solo su https o localhost (su file:// il browser non lo supporta)
+        var swOk = window.location.protocol === 'https:' ||
+            window.location.hostname === 'localhost' ||
+            window.location.hostname === '127.0.0.1';
+        if ('serviceWorker' in navigator && swOk) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('sw.js', { scope: './' })
+                    .then(function() { console.log('ServiceWorker registrato'); })
+                    .catch(function(err) { console.warn('ServiceWorker non registrato:', err.message); });
             });
         }
     </script>

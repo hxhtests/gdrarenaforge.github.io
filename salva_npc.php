@@ -5,15 +5,22 @@ ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 ini_set('error_log', 'npc_errors.log');
 
-// Imposta gli header CORS e di sicurezza
-header("Access-Control-Allow-Origin: http://localhost:8080");
+// CORS: origini consentite (aggiungere il dominio di produzione)
+$allowed_origins = ['http://localhost:8080', 'http://127.0.0.1:8080', 'https://hxhtest.github.io'];
+$origin = isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '';
+if (in_array($origin, $allowed_origins)) {
+    header("Access-Control-Allow-Origin: " . $origin);
+} else {
+    header("Access-Control-Allow-Origin: " . $allowed_origins[0]);
+}
+
 header("Access-Control-Allow-Methods: POST");
 header("Access-Control-Allow-Headers: Content-Type");
 header('Content-Type: application/json');
 header("X-Content-Type-Options: nosniff");
 header("X-Frame-Options: DENY");
 header("X-XSS-Protection: 1; mode=block");
-header("Content-Security-Policy: default-src 'self'");
+header("Content-Security-Policy: default-src 'self'; script-src 'self'");
 
 // Funzione per sanitizzare input
 function sanitizeInput($data) {
