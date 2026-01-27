@@ -749,7 +749,9 @@ function mostraNPCSelezionato() {
     }
     
     // Costruisci il percorso dell'immagine in base al piano dell'NPC (escape per XSS in url())
-    const imagePath = npc.imageUrl || `images/Default_NPC/${npc.pianoArenaCeleste}°.png`;
+    // Su GitHub/siti web serve path assoluto dalla root; in locale (file://) serve path relativo
+    const defaultImgRel = `images/Default_NPC/${npc.pianoArenaCeleste}°.png`;
+    const imagePath = npc.imageUrl || ((location.protocol === 'https:' || location.protocol === 'http:') ? (location.origin + '/' + defaultImgRel) : defaultImgRel);
     const imagePathSafe = escapeCssUrl(imagePath);
     
     // Crea il contenuto HTML per l'NPC (escape di tutti i dati utente)
