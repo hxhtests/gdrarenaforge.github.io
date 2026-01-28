@@ -1,0 +1,27 @@
+Rinominare i file delle miniature da "piano°.png" a "Nome_Cognome.png" come segue:
+
+1°.png     -> Ibeve_Pitagonus.png
+10°.png    -> Boki_Luagin.png
+20°.png    -> Kristoff_Jortek.png
+30°.png    -> Starius_Mourniol.png
+40°.png    -> Rey_Budgerigar.png
+50°.png    -> Damix_Urazuka.png
+60°.png    -> Oldaf_Mitgefuhl.png
+70°.png    -> Olga_Strapopovich.png
+80°.png    -> Sphylos_Tender.png
+90°.png    -> Oran_Lee.png
+110°.png   -> Korinna_Fanning.png
+130°.png   -> Darius_Cerberix.png
+180°.png   -> Zero-F.png
+190°.png   -> Red.png
+
+Se hai Node.js installato, puoi eseguire dalla cartella Default_NPC:
+  node rename-by-nome.js
+
+Oppure rinomina manualmente i file secondo la tabella sopra.
+
+Per gli NPC piano 0 (Goro Domon, Suki Hazuki, Billy Crane, Rhino Vercetti) aggiungi:
+  Goro_Domon.png
+  Suki_Hazuki.png
+  Billy_Crane.png
+  Rhino_Vercetti.png

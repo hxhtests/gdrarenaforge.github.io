@@ -15,6 +15,13 @@ function escapeCssUrl(str) {
     return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
 }
 
+// Nome NPC -> nome file miniatura (spazi in _, caratteri speciali normalizzati per path sicuro)
+function nomeNPCToFileName(nome) {
+    if (nome == null || typeof nome !== 'string') return 'default.png';
+    var s = String(nome).trim().replace(/\s+/g, '_').replace(/ü/g, 'u').replace(/ö/g, 'o').replace(/ä/g, 'a').replace(/ß/g, 'ss');
+    return (s || 'default') + '.png';
+}
+
 // Salvataggio localStorage con gestione QuotaExceeded (riduce backup e riprova)
 function safeSetItem(key, value) {
     try {
@@ -748,11 +755,10 @@ function mostraNPCSelezionato() {
         return;
     }
     
-    // Miniatura: su web (http/https, es. GitHub) usare sempre immagini locali da images/Default_NPC/;
-    // in locale (file://) per i default usare miniatura dallo script, per gli altri npc.imageUrl o fallback locale
+    // Miniatura: path da nome NPC (nome_nome.png) in images/Default_NPC/; su web URL assoluto
     const isWeb = (location.protocol === 'https:' || location.protocol === 'http:');
-    const fileName = npc.pianoArenaCeleste + '°.png';
-    const defaultImgRel = isWeb ? ('images/Default_NPC/' + encodeURIComponent(fileName)) : ('images/Default_NPC/' + fileName);
+    const fileName = nomeNPCToFileName(npc.nome);
+    const defaultImgRel = 'images/Default_NPC/' + (isWeb ? encodeURIComponent(fileName) : fileName);
     let imagePath;
     const npcDefault = (typeof defaultNPCs !== 'undefined' && defaultNPCs.npcs) ? defaultNPCs.npcs.find(function(d) { return d.nome === npc.nome; }) : null;
     if (isWeb) {
@@ -760,7 +766,7 @@ function mostraNPCSelezionato() {
     } else if (npcDefault && npcDefault.miniatura) {
         imagePath = npcDefault.miniatura;
     } else {
-        imagePath = npc.imageUrl || defaultImgRel;
+        imagePath = npc.imageUrl || ('images/Default_NPC/' + fileName);
     }
     const imagePathSafe = escapeCssUrl(imagePath);
     
