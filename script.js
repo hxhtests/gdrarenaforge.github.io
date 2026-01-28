@@ -755,22 +755,9 @@ function mostraNPCSelezionato() {
         return;
     }
     
-    // Miniatura: path da nome NPC (nome_nome.png) in images/Default_NPC/
-    const isWeb = (location.protocol === 'https:' || location.protocol === 'http:');
+    // Miniatura: path relativo al file immagine (come immagine normale in HTML)
     const fileName = nomeNPCToFileName(npc.nome);
-    const imgRel = 'images/Default_NPC/' + (isWeb ? encodeURIComponent(fileName) : fileName);
-    let imagePath;
-    const npcDefault = (typeof defaultNPCs !== 'undefined' && defaultNPCs.npcs) ? defaultNPCs.npcs.find(function(d) { return d.nome === npc.nome; }) : null;
-    if (isWeb) {
-        var base = location.pathname.replace(/\/[^/]*$/, '/');
-        if (base.indexOf('/') !== 0) base = '/' + base;
-        imagePath = location.origin + base + imgRel;
-    } else if (npcDefault && npcDefault.miniatura) {
-        imagePath = npcDefault.miniatura;
-    } else {
-        imagePath = npc.imageUrl || ('images/Default_NPC/' + fileName);
-    }
-    const imagePathSafe = escapeCssUrl(imagePath);
+    const imagePath = 'images/Default_NPC/' + fileName;
     const imagePathForAttr = String(imagePath).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
     
     // Crea il contenuto HTML per l'NPC (escape di tutti i dati utente); avatar con <img> per caricamento esplicito
