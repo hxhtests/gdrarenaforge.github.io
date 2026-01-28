@@ -748,15 +748,18 @@ function mostraNPCSelezionato() {
         return;
     }
     
-    // Miniatura: per gli NPC default usare sempre quella definita nello script (defaultNPCs);
-    // per gli altri usare npc.imageUrl oppure il fallback locale Default_NPC
+    // Miniatura: su web (http/https, es. GitHub) usare sempre immagini locali da images/Default_NPC/;
+    // in locale (file://) per i default usare miniatura dallo script, per gli altri npc.imageUrl o fallback locale
+    const isWeb = (location.protocol === 'https:' || location.protocol === 'http:');
+    const defaultImgRel = `images/Default_NPC/${npc.pianoArenaCeleste}°.png`;
     let imagePath;
     const npcDefault = (typeof defaultNPCs !== 'undefined' && defaultNPCs.npcs) ? defaultNPCs.npcs.find(function(d) { return d.nome === npc.nome; }) : null;
-    if (npcDefault && npcDefault.miniatura) {
+    if (isWeb) {
+        imagePath = location.origin + '/' + defaultImgRel;
+    } else if (npcDefault && npcDefault.miniatura) {
         imagePath = npcDefault.miniatura;
     } else {
-        const defaultImgRel = `images/Default_NPC/${npc.pianoArenaCeleste}°.png`;
-        imagePath = npc.imageUrl || ((location.protocol === 'https:' || location.protocol === 'http:') ? (location.origin + '/' + defaultImgRel) : defaultImgRel);
+        imagePath = npc.imageUrl || defaultImgRel;
     }
     const imagePathSafe = escapeCssUrl(imagePath);
     
