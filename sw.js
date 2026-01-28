@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hxh-gdr-arena-forge-v1.0.2';
+const CACHE_NAME = 'hxh-gdr-arena-forge-v1.0.3';
 
 // Path base della app (funziona sia in root che in sottocartella, es. GitHub Pages)
 function getBaseUrl() {

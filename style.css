@@ -921,6 +921,12 @@ input, select {
     background-repeat: no-repeat;
 }
 
+.avatar.avatar-img {
+    display: block;
+    object-fit: cover;
+    object-position: center;
+}
+
 .nome-personaggio {
     width: auto;
     font-family: times;
