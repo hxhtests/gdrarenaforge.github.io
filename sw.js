@@ -88,8 +88,12 @@ self.addEventListener('fetch', (event) => {
                         return response;
                     })
                     .catch(() => {
-                        const base = getBaseUrl();
-                        return caches.match(base + 'offline.html').then(r => r || caches.match('offline.html'));
+                        // Offline fallback solo per navigazione (pagina), non per immagini/asset
+                        if (event.request.mode === 'navigate') {
+                            const base = getBaseUrl();
+                            return caches.match(base + 'offline.html').then(r => r || caches.match('offline.html'));
+                        }
+                        return Promise.reject(new Error('Network failed'));
                     });
             })
     );

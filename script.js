@@ -751,7 +751,8 @@ function mostraNPCSelezionato() {
     // Miniatura: su web (http/https, es. GitHub) usare sempre immagini locali da images/Default_NPC/;
     // in locale (file://) per i default usare miniatura dallo script, per gli altri npc.imageUrl o fallback locale
     const isWeb = (location.protocol === 'https:' || location.protocol === 'http:');
-    const defaultImgRel = `images/Default_NPC/${npc.pianoArenaCeleste}°.png`;
+    const fileName = npc.pianoArenaCeleste + '°.png';
+    const defaultImgRel = isWeb ? ('images/Default_NPC/' + encodeURIComponent(fileName)) : ('images/Default_NPC/' + fileName);
     let imagePath;
     const npcDefault = (typeof defaultNPCs !== 'undefined' && defaultNPCs.npcs) ? defaultNPCs.npcs.find(function(d) { return d.nome === npc.nome; }) : null;
     if (isWeb) {
